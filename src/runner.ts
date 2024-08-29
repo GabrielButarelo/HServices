@@ -12,16 +12,15 @@ export default class Runner {
 		this.logger = new Logger();
 
 		this.loadOptions(args);
-		// todo: load env file
-		// todo: load config file
+		// TODO: load env file
+		// TODO: load config file
 		this.startBroker();
 	}
 
 	loadOptions(args: string[]) {
 		this.logger.info('Loading runner options');
-		// todo: create options
 		program.option('-d, --debug', 'output extra debugging');
-		program.option('-m, --mask', 'file mask to services');
+		program.option('-m, --mask <mask>', 'file mask to services');
 		program.parse(args);
 		this.options = program.opts();
 		this.logger.info('Loaded runner options');
@@ -34,13 +33,16 @@ export default class Runner {
 		this.broker = new Broker();
 		this.broker.logger = this.logger;
 
-		Promise.resolve(this.broker.loadServices())
+		this.broker
+			.loadServices('', this.options.mask || '**/*.service.ts')
 			.then(() => {
-				this.options;
-				this.logger.info('Started broker');
+				return this.broker.startAllServices();
+			})
+			.then(() => {
+				this.logger.info('Started broker and services');
 			})
 			.catch(error => {
-				this.logger.error('Error start broker: ' + error.message);
+				this.logger.error('Error starting broker: ' + error.message);
 			});
 	}
 }
