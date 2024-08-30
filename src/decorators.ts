@@ -1,7 +1,5 @@
-import Service from './service';
-
 export function Event(config: { name: string; group: string }) {
-	return function (target: any, propertyKey: string) {
+	return function (target: any, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
 		Reflect.defineMetadata('eventConfig', config, target, propertyKey);
 	};
 }

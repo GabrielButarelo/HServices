@@ -1,4 +1,6 @@
-import { ServiceDecorator } from '../src/decorators';
+import { CronJob } from 'cron';
+import Broker from '../src/broker';
+import { Event, ServiceDecorator } from '../src/decorators';
 import Service from '../src/service';
 
 @ServiceDecorator({
@@ -6,15 +8,17 @@ import Service from '../src/service';
 	group: 'group-teste',
 })
 export default class MyService extends Service {
-	constructor() {
-		super();
+	constructor(broker: Broker) {
+		super(broker);
 	}
 
 	async onStarted(): Promise<void> {
-		console.log('Mensagem do onStarted do serviço teste');
-	}
-
-	async onStopped(): Promise<void> {
-		console.log('Mensagem do onStoped do serviço teste');
+		new CronJob('*/10 * * * * *', async () => {
+			try {
+				this.broker.emit('create', 'teste');
+			} catch {
+				new Error('Cron not run');
+			}
+		}).start();
 	}
 }

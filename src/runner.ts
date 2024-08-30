@@ -18,16 +18,16 @@ export default class Runner {
 	}
 
 	loadOptions(args: string[]) {
-		this.logger.info('Loading runner options');
+		this.logger.info('RUNNER', 'Loading runner options');
 		program.option('-d, --debug', 'output extra debugging');
 		program.option('-m, --mask <mask>', 'file mask to services');
 		program.parse(args);
 		this.options = program.opts();
-		this.logger.info('Loaded runner options');
+		this.logger.info('RUNNER', 'Loaded runner options');
 	}
 
 	startBroker() {
-		this.logger.info('Starting broker');
+		this.logger.info('RUNNER', 'Starting broker');
 		if (this.broker) return;
 
 		this.broker = new Broker();
@@ -39,12 +39,13 @@ export default class Runner {
 				return this.broker.startAllServices();
 			})
 			.then(() => {
-				this.logger.info('Started broker and services');
+				this.logger.info('RUNNER', 'Started broker and services');
 			})
 			.catch(error => {
-				this.logger.error('Error starting broker: ' + error.message);
+				this.logger.error('RUNNER', 'Error starting broker: ' + error.message);
 			});
 	}
 }
 
 new Runner().start(process.argv);
+process.stdin.resume();

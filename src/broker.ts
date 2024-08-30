@@ -2,31 +2,56 @@ import { glob } from 'glob';
 import path from 'path';
 import Logger from './logger';
 import Service from './service';
+import EventEmitter from 'events';
 
 type ServiceConstructor = new (...args: any[]) => Service;
 
 export default class Broker {
 	private services: Map<string, Service> = new Map();
+	private eventEmitter: EventEmitter;
 	public logger: Logger;
 
 	constructor() {
-		this.setupGracefulShutdown();
+		this.eventEmitter = new EventEmitter();
+		this.setupShutdown();
 	}
 
-	public registerService(name: string, serviceClass: ServiceConstructor) {
-		const service = new serviceClass();
+	private registerService(name: string, serviceClass: ServiceConstructor) {
+		const service = new serviceClass(this);
 		this.services.set(name, service);
 
 		service.on('started', info => {
-			this.logger.info(`Service ${info.name} for group ${info.group} started`);
+			this.registerEvents(service);
+			this.logger.info('BROKER', `Service ${info.name} for group ${info.group} started`);
 		});
 
 		service.on('stopped', info => {
-			this.logger.info(`Service ${info.name} for group ${info.group} stopped`);
+			this.logger.info('BROKER', `Service ${info.name} for group ${info.group} stopped`);
 		});
 	}
 
-	public async startAllServices() {
+	private registerEvents(service: Service) {
+		const prototype = Object.getPrototypeOf(service);
+
+		Object.getOwnPropertyNames(prototype).forEach(methodName => {
+			const method = prototype[methodName];
+			const eventConfig = Reflect.getMetadata('eventConfig', service, methodName);
+
+			if (eventConfig) {
+				const { name, group } = eventConfig;
+
+				this.logger.info('BROKER', `Registry event name ${name} for group ${group}`);
+
+				this.eventEmitter.on(name, method.bind(service));
+			}
+		});
+	}
+
+	emit(eventName: string, payload: any) {
+		this.eventEmitter.emit(eventName, payload);
+	}
+
+	async startAllServices() {
 		const startPromises: Promise<void>[] = [];
 
 		this.services.forEach(service => {
@@ -36,7 +61,7 @@ export default class Broker {
 		await Promise.all(startPromises);
 	}
 
-	public async stopAllServices() {
+	private async stopAllServices() {
 		const stopPromises: Promise<void>[] = [];
 
 		this.services.forEach(service => {
@@ -67,21 +92,21 @@ export default class Broker {
 		}
 	}
 
-	findServiceFiles(rootDir: string, mask: string): string[] {
+	private findServiceFiles(rootDir: string, mask: string): string[] {
 		const pattern = path.resolve(process.cwd(), rootDir, mask);
 		return glob.sync(pattern.replace(/\\/g, '/'), { absolute: true });
 	}
 
-	setupGracefulShutdown() {
-		const shutdown = async () => {
-			this.logger.info('Stopping broker');
-			this.stopAllServices();
-			this.logger.info('Stopped broker');
-			process.exit(0);
-		};
+	private setupShutdown() {
+		process.on('SIGINT', () => this.shutdown());
+		process.on('SIGTERM', () => this.shutdown());
+		process.on('exit', () => this.shutdown());
+	}
 
-		process.on('SIGINT', shutdown);
-		process.on('SIGTERM', shutdown);
-		process.on('exit', shutdown);
+	private async shutdown() {
+		this.logger.info('BROKER', 'Stopping broker');
+		await this.stopAllServices();
+		this.logger.info('BROKER', 'Stopped broker');
+		process.exit(0);
 	}
 }

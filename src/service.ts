@@ -1,14 +1,20 @@
 import { EventEmitter } from 'events';
 import 'reflect-metadata';
+import Broker from './broker';
+import Logger from './logger';
 
 export default abstract class Service extends EventEmitter {
 	public name: string;
 	public group: string;
 	public events: any;
+	protected broker: Broker;
+	protected logger: Logger;
 
-	constructor() {
+	constructor(broker: Broker) {
 		super();
 		this.events = {};
+		this.broker = broker;
+		this.logger = this.broker.logger;
 		this.initialize();
 	}
 
